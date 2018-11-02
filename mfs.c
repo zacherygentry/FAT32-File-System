@@ -77,6 +77,7 @@ FILE *fp;
 void getInput();
 void execute();
 void openImage(char file[]);
+void closeImage();
 
 int main()
 {
@@ -85,7 +86,6 @@ int main()
     // PROGRAM LOOP //
     //////////////////
 
-    fclose(fp);
     while (1)
     {
         getInput();
@@ -94,13 +94,14 @@ int main()
     return 0;
 }
 
-// int16_t NextLB( uint32_t sector) {
-//     uint32_t FATAddress = ( BPB_BytsPerSec * BPB_RsvdSecCnt ) + ( sector * 4 );
-//     int16_t val;
-//     fseek( fp, FATAddress, SEEK_SET );
-//     fread( &val, 2, 1, fp);
-//     return val;
-// }
+int16_t NextLB(uint32_t sector)
+{
+    uint32_t FATAddress = (BPB_BytesPerSec * BPB_RsvdSecCnt) + (sector * 4);
+    int16_t val;
+    fseek(fp, FATAddress, SEEK_SET);
+    fread(&val, 2, 1, fp);
+    return val;
+}
 
 void getInput()
 {
@@ -166,10 +167,6 @@ void execute()
             printf("ERR: Must give argument of file to open\n");
         }
     }
-    else if (strcmp(token[0], "stat") == 0)
-    {
-        printf("");
-    }
     else if (strcmp(token[0], "info") == 0)
     {
         printf("BPB_BytesPerSec: %d\n", BPB_BytesPerSec);
@@ -177,6 +174,10 @@ void execute()
         printf("BPB_RsvdSecCnt: %d\n", BPB_RsvdSecCnt);
         printf("BPB_NumFATs: %d\n", BPB_NumFATs);
         printf("BPB_FATSz32: %d\n", BPB_FATSz32);
+    }
+    else if (strcmp(token[0], "close") == 0)
+    {
+        closeImage();
     }
 }
 
@@ -192,6 +193,18 @@ void openImage(char file[])
     fread(&BPB_RsvdSecCnt, 2, 1, fp);
     fread(&BPB_NumFATs, 1, 1, fp);
     fread(&BPB_RootEntCnt, 2, 1, fp);
-    fseek(fp, 22, SEEK_SET);
+    fseek(fp, 36, SEEK_SET);
     fread(&BPB_FATSz32, 4, 1, fp);
+}
+
+void closeImage()
+{
+    if (fp == NULL)
+    {
+        printf("Error: File system not open.");
+        return;
+    }
+
+    fclose(fp);
+    fp = NULL;
 }
