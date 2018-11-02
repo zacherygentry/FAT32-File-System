@@ -172,11 +172,11 @@ void execute()
     }
     else if (strcmp(token[0], "info") == 0)
     {
-        printf("%d\n", BPB_BytesPerSec);
-        printf("%d\n", BPB_SecPerClus);
-        printf("%d\n", BPB_RsvdSecCnt);
-        printf("%d\n", BPB_NumFATs);
-        printf("%d\n", BPB_FATSz32);
+        printf("BPB_BytesPerSec: %d\n", BPB_BytesPerSec);
+        printf("BPB_SecPerClus: %d\n", BPB_SecPerClus);
+        printf("BPB_RsvdSecCnt: %d\n", BPB_RsvdSecCnt);
+        printf("BPB_NumFATs: %d\n", BPB_NumFATs);
+        printf("BPB_FATSz32: %d\n", BPB_FATSz32);
     }
 }
 
