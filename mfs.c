@@ -27,13 +27,11 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-
 #include <stdio.h>
 #include <stdint.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
-
 
 #define WHITESPACE " \t\n" // We want to split our command line up into tokens \
                            // so we need to define what delimits our tokens.   \
@@ -44,13 +42,12 @@
 
 #define MAX_NUM_ARGUMENTS 10 // Mav shell only supports five arguments
 
-
 // token and cmd_str used for tokenizing user input
 char *token[MAX_NUM_ARGUMENTS];
 char cmd_str[MAX_COMMAND_SIZE];
 
 char BS_OEMName[8];
-int16_t BPB_BytsPerSec;
+int16_t BPB_BytesPerSec;
 int8_t BPB_SecPerClus;
 int16_t BPB_RsvdSecCnt;
 int8_t BPB_NumFATs;
@@ -63,7 +60,8 @@ int32_t RootDirSectors = 0;
 int32_t FirstDataSector = 0;
 int32_t FirstSectorofCluster = 0;
 
-struct __attribute__((__packed__)) DirectoryEntry {
+struct __attribute__((__packed__)) DirectoryEntry
+{
     char DIR_Name[11];
     uint8_t DIR_Attr;
     uint8_t Unused1[8];
@@ -74,8 +72,11 @@ struct __attribute__((__packed__)) DirectoryEntry {
 };
 struct DirectoryEntry dir[16];
 
+FILE *fp;
 
 void getInput();
+void execute();
+void openImage(char file[]);
 
 int main()
 {
@@ -84,22 +85,22 @@ int main()
     // PROGRAM LOOP //
     //////////////////
 
+    fclose(fp);
     while (1)
     {
         getInput();
-        int i;
-        printf("%d\n", NextLB(0));
+        execute();
     }
     return 0;
 }
 
-int16_t NextLB( uint32_t sector) {
-    uint32_t FATAddress = ( BPB_BytsPerSec * BPB_RsvdSecCnt ) + ( sector * 4 );
-    int16_t val;
-    fseek( fp, FATAddress, SEEK_SET );
-    fread( &val, 2, 1, fp);
-    return val;
-}
+// int16_t NextLB( uint32_t sector) {
+//     uint32_t FATAddress = ( BPB_BytsPerSec * BPB_RsvdSecCnt ) + ( sector * 4 );
+//     int16_t val;
+//     fseek( fp, FATAddress, SEEK_SET );
+//     fread( &val, 2, 1, fp);
+//     return val;
+// }
 
 void getInput()
 {
@@ -144,4 +145,53 @@ void getInput()
     }
 
     free(working_root);
+}
+
+void execute()
+{
+    // If the user just hits enter, do nothing
+    if (token[0] == NULL)
+    {
+        return;
+    }
+
+    if (strcmp(token[0], "open") == 0)
+    {
+        if (token[1] != NULL)
+        {
+            openImage(token[1]);
+        }
+        else
+        {
+            printf("ERR: Must give argument of file to open\n");
+        }
+    }
+    else if (strcmp(token[0], "stat") == 0)
+    {
+        printf("");
+    }
+    else if (strcmp(token[0], "info") == 0)
+    {
+        printf("%d\n", BPB_BytesPerSec);
+        printf("%d\n", BPB_SecPerClus);
+        printf("%d\n", BPB_RsvdSecCnt);
+        printf("%d\n", BPB_NumFATs);
+        printf("%d\n", BPB_FATSz32);
+    }
+}
+
+void openImage(char file[])
+{
+    fp = fopen(file, "r");
+    printf("%s opened.\n", file);
+    fseek(fp, 3, SEEK_SET);
+    fread(&BS_OEMName, 8, 1, fp);
+    fseek(fp, 11, SEEK_SET);
+    fread(&BPB_BytesPerSec, 2, 1, fp);
+    fread(&BPB_SecPerClus, 1, 1, fp);
+    fread(&BPB_RsvdSecCnt, 2, 1, fp);
+    fread(&BPB_NumFATs, 1, 1, fp);
+    fread(&BPB_RootEntCnt, 2, 1, fp);
+    fseek(fp, 22, SEEK_SET);
+    fread(&BPB_FATSz32, 4, 1, fp);
 }
