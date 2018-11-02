@@ -29,6 +29,7 @@
 
 
 #include <stdio.h>
+#include <stdint.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
@@ -48,6 +49,30 @@
 char *token[MAX_NUM_ARGUMENTS];
 char cmd_str[MAX_COMMAND_SIZE];
 
+char BS_OEMName[8];
+int16_t BPB_BytsPerSec;
+int8_t BPB_SecPerClus;
+int16_t BPB_RsvdSecCnt;
+int8_t BPB_NumFATs;
+int16_t BPB_RootEntCnt;
+char BS_VolLab[11];
+int32_t BPB_FATSz32;
+int32_t BPB_RootClus;
+
+int32_t RootDirSectors = 0;
+int32_t FirstDataSector = 0;
+int32_t FirstSectorofCluster = 0;
+
+struct __attribute__((__packed__)) DirectoryEntry {
+    char DIR_Name[11];
+    uint8_t DIR_Attr;
+    uint8_t Unused1[8];
+    uint16_t DIR_FirstClusterHigh;
+    uint8_t Unused2[4];
+    uint16_t DIR_FirstClusterLow;
+    uint32_t DIR_FileSize;
+};
+struct DirectoryEntry dir[16];
 
 
 void getInput();
@@ -62,10 +87,19 @@ int main()
     while (1)
     {
         getInput();
+        int i;
+        printf("%d\n", NextLB(0));
     }
     return 0;
 }
 
+int16_t NextLB( uint32_t sector) {
+    uint32_t FATAddress = ( BPB_BytsPerSec * BPB_RsvdSecCnt ) + ( sector * 4 );
+    int16_t val;
+    fseek( fp, FATAddress, SEEK_SET );
+    fread( &val, 2, 1, fp);
+    return val;
+}
 
 void getInput()
 {
