@@ -185,16 +185,31 @@ void openImage(char file[])
 {
     fp = fopen(file, "r");
     printf("%s opened.\n", file);
+
     fseek(fp, 3, SEEK_SET);
     fread(&BS_OEMName, 8, 1, fp);
+
     fseek(fp, 11, SEEK_SET);
     fread(&BPB_BytesPerSec, 2, 1, fp);
     fread(&BPB_SecPerClus, 1, 1, fp);
     fread(&BPB_RsvdSecCnt, 2, 1, fp);
     fread(&BPB_NumFATs, 1, 1, fp);
     fread(&BPB_RootEntCnt, 2, 1, fp);
+
     fseek(fp, 36, SEEK_SET);
     fread(&BPB_FATSz32, 4, 1, fp);
+
+    fseek(fp, 44, SEEK_SET);
+    fread(&BPB_RootClus, 4, 1, fp);
+
+
+    int i;
+    for (i = 0; i < 16; i++)
+    {
+        fread(&dir[i], 32, 1, fp);
+        printf("%s\n", dir[i].DIR_Name);
+        printf("%d\n", dir[i].DIR_FileSize);
+    }
 }
 
 void closeImage()
