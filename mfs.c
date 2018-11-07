@@ -60,6 +60,8 @@ int32_t RootDirSectors = 0;
 int32_t FirstDataSector = 0;
 int32_t FirstSectorofCluster = 0;
 
+int32_t currentDirectory;
+
 struct __attribute__((__packed__)) DirectoryEntry
 {
     char DIR_Name[11];
@@ -78,6 +80,9 @@ void getInput();
 void execute();
 void openImage(char file[]);
 void closeImage();
+void printDirectory();
+void changeDirectory(int32_t sector);
+void getDirectoryInfo();
 
 int main()
 {
@@ -85,7 +90,6 @@ int main()
     //////////////////
     // PROGRAM LOOP //
     //////////////////
-
     while (1)
     {
         getInput();
@@ -94,10 +98,11 @@ int main()
     return 0;
 }
 
-int LBAToOffset( int32_t sector )
+int LBAToOffset(int32_t sector)
 {
-  if( sector == 0 ) sector = 2;
-  return (( sector - 2 ) * BPB_BytesPerSec ) + ( BPB_BytesPerSec * BPB_RsvdSecCnt ) + ( BPB_NumFATs * BPB_FATSz32 * BPB_BytesPerSec );
+    if (sector == 0)
+        sector = 2;
+    return ((sector - 2) * BPB_BytesPerSec) + (BPB_BytesPerSec * BPB_RsvdSecCnt) + (BPB_NumFATs * BPB_FATSz32 * BPB_BytesPerSec);
 }
 
 int16_t NextLB(uint32_t sector)
@@ -181,6 +186,14 @@ void execute()
         printf("BPB_NumFATs: %d\n", BPB_NumFATs);
         printf("BPB_FATSz32: %d\n", BPB_FATSz32);
     }
+    else if (strcmp(token[0], "ls") == 0)
+    {
+        printDirectory();
+    }
+    else if (strcmp(token[0], "cd") == 0)
+    {
+        changeDirectory(6099);
+    }
     else if (strcmp(token[0], "close") == 0)
     {
         closeImage();
@@ -207,54 +220,51 @@ void openImage(char file[])
 
     fseek(fp, 44, SEEK_SET);
     fread(&BPB_RootClus, 4, 1, fp);
+    currentDirectory = BPB_RootClus;
 
-    int offset = LBAToOffset( BPB_RootClus );
-    fseek( fp, offset, SEEK_SET );
+    // -- hard code get num.txt ( cluster 17, size 8 ) --
+    FILE *newfp = fopen("NUM.txt", "w");
+    fseek(fp, LBAToOffset(17), SEEK_SET);
+    unsigned char *ptr = (char *)malloc(8);
+    fread(ptr, 8, 1, fp);
+    fwrite(ptr, 8, 1, newfp);
+    fclose(newfp);
+}
+
+void changeDirectory(int32_t cluster)
+{
+    int offset = LBAToOffset(cluster);
+    currentDirectory = cluster;
+    fseek(fp, offset, SEEK_SET);
+}
+
+void getDirectoryInfo()
+{
+    int i;
+    for (i = 0; i < 16; i++)
+    {
+        fread(&dir[i], 32, 1, fp);
+    }
+}
+
+void printDirectory()
+{
+    int offset = LBAToOffset(currentDirectory);
+    fseek(fp, offset, SEEK_SET);
+
     int i;
     for (i = 0; i < 16; i++)
     {
         fread(&dir[i], 32, 1, fp);
 
-        if( ( dir[i].DIR_Name[0] != (char)0xe5 ) &&
-             ( dir[i].DIR_Attr == 0x1 || dir[i].DIR_Attr == 0x10 || dir[i].DIR_Attr == 0x20 ))
+        if ((dir[i].DIR_Name[0] != (char)0xe5) &&
+            (dir[i].DIR_Attr == 0x1 || dir[i].DIR_Attr == 0x10 || dir[i].DIR_Attr == 0x20))
         {
-          printf("%s\n", dir[i].DIR_Name);
-          printf("%d\n", dir[i].DIR_FileSize);
-          printf("%d\n", dir[i].DIR_FirstClusterLow );
-        }
-    }
-
-    // hack cd here
-    {
-
-      printf("--- Hard code cd to foldera \n");
-      int offset;
-      offset = LBAToOffset( 6099 );
-      fseek( fp, offset, SEEK_SET );
-
-      int i;
-      for (i = 0; i < 16; i++)
-      {
-          fread(&dir[i], 32, 1, fp);
-  
-          if( ( dir[i].DIR_Name[0] != (char)0xe5 ) &&
-               ( dir[i].DIR_Attr == 0x1 || dir[i].DIR_Attr == 0x10 || dir[i].DIR_Attr == 0x20 ))
-          {
             printf("%s\n", dir[i].DIR_Name);
             printf("%d\n", dir[i].DIR_FileSize);
-            printf("%d\n", dir[i].DIR_FirstClusterLow );
-          }
-      }
+            printf("%d\n", dir[i].DIR_FirstClusterLow);
+        }
     }
-
-
-   // -- hard code get num.txt ( cluster 17, size 8 ) --
-   FILE *newfp = fopen( "NUM.txt", "w" );
-   fseek( fp, LBAToOffset( 17 ), SEEK_SET );
-   unsigned char *ptr = (char*)malloc( 8 ) ;
-   fread( ptr, 8, 1, fp );
-   fwrite( ptr, 8, 1, newfp ); 
-   fclose( newfp );
 }
 
 void closeImage()
