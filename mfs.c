@@ -32,6 +32,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 
 #define WHITESPACE " \t\n" // We want to split our command line up into tokens \
                            // so we need to define what delimits our tokens.   \
@@ -83,6 +84,8 @@ void closeImage();
 void printDirectory();
 void changeDirectory(int32_t sector);
 void getDirectoryInfo();
+int32_t getCluster(char *dirname);
+char *formatDirectory(char *dirname);
 
 int main()
 {
@@ -90,6 +93,7 @@ int main()
     //////////////////
     // PROGRAM LOOP //
     //////////////////
+    printf("%s\n", formatDirectory("FOLDERA     TXT"));
     while (1)
     {
         getInput();
@@ -169,11 +173,17 @@ void execute()
 
     if (strcmp(token[0], "open") == 0)
     {
-        if (token[1] != NULL)
+        if (fp != NULL)
+        {
+            printf("Error: File system image already open.\n");
+            return;
+        }
+
+        if (token[1] != NULL && fp == NULL)
         {
             openImage(token[1]);
         }
-        else
+        else if (token[1] == NULL)
         {
             printf("ERR: Must give argument of file to open\n");
         }
@@ -192,7 +202,12 @@ void execute()
     }
     else if (strcmp(token[0], "cd") == 0)
     {
-        changeDirectory(6099);
+        if (token[1] == NULL)
+        {
+            printf("ERR: Please provide which directory you would like to open\n");
+            return;
+        }
+        changeDirectory(getCluster(token[1]));
     }
     else if (strcmp(token[0], "close") == 0)
     {
@@ -225,10 +240,37 @@ void openImage(char file[])
     // -- hard code get num.txt ( cluster 17, size 8 ) --
     FILE *newfp = fopen("NUM.txt", "w");
     fseek(fp, LBAToOffset(17), SEEK_SET);
-    unsigned char *ptr = (char *)malloc(8);
+    unsigned char *ptr = malloc(8);
     fread(ptr, 8, 1, fp);
     fwrite(ptr, 8, 1, newfp);
     fclose(newfp);
+}
+
+char *formatDirectory(char *dirname)
+{
+    char formatdir[12];
+    memset(formatdir, ' ', 12);
+    char *period = strtok(dirname, ".");
+    strncpy(formatdir, period, strlen(period));
+    period = strtok(NULL, ".");
+    if (period)
+    {
+        strncpy((char *)(formatdir + 8), period, strlen(period));
+    }
+    formatdir[11] = '\0';
+    int i;
+    for (i = 0; i < 11; i++)
+    {
+        formatdir[i] = toupper(formatdir[i]);
+    }
+
+    return formatdir;
+}
+
+int32_t getCluster(char *dirname)
+{
+    //Compare dirname to directory name (attribute), if same, cd into FirstClusterLow
+    return 2;
 }
 
 void changeDirectory(int32_t cluster)
@@ -260,9 +302,12 @@ void printDirectory()
         if ((dir[i].DIR_Name[0] != (char)0xe5) &&
             (dir[i].DIR_Attr == 0x1 || dir[i].DIR_Attr == 0x10 || dir[i].DIR_Attr == 0x20))
         {
-            printf("%s\n", dir[i].DIR_Name);
-            printf("%d\n", dir[i].DIR_FileSize);
-            printf("%d\n", dir[i].DIR_FirstClusterLow);
+            char *directory = malloc(11);
+            memset(directory, '\0', 11);
+            memcpy(directory, dir[i].DIR_Name, 11);
+            printf("Directory Name: %s\n", directory);
+            printf("Filesize: %d\n", dir[i].DIR_FileSize);
+            printf("Cluster: %d\n", dir[i].DIR_FirstClusterLow);
         }
     }
 }
