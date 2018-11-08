@@ -62,6 +62,7 @@ int32_t FirstDataSector = 0;
 int32_t FirstSectorofCluster = 0;
 
 int32_t currentDirectory;
+char formattedDirectory[12];
 
 struct __attribute__((__packed__)) DirectoryEntry
 {
@@ -85,7 +86,8 @@ void printDirectory();
 void changeDirectory(int32_t sector);
 void getDirectoryInfo();
 int32_t getCluster(char *dirname);
-char *formatDirectory(char *dirname);
+void formatDirectory(char *dirname);
+void get();
 
 int main()
 {
@@ -93,7 +95,10 @@ int main()
     //////////////////
     // PROGRAM LOOP //
     //////////////////
-    printf("%s\n", formatDirectory("FOLDERA     TXT"));
+    formatDirectory("foo.txt");
+    //FOO     TXT
+
+    printf("%s\n", formattedDirectory);
     while (1)
     {
         getInput();
@@ -246,31 +251,54 @@ void openImage(char file[])
     fclose(newfp);
 }
 
-char *formatDirectory(char *dirname)
+void get(char *dirname)
 {
-    char formatdir[12];
-    memset(formatdir, ' ', 12);
-    char *period = strtok(dirname, ".");
-    strncpy(formatdir, period, strlen(period));
-    period = strtok(NULL, ".");
-    if (period)
+    // -- hard code get num.txt ( cluster 17, size 8 ) --
+    FILE *newfp = fopen("NUM.txt", "w");
+    fseek(fp, LBAToOffset(17), SEEK_SET);
+    unsigned char *ptr = malloc(8);
+    fread(ptr, 8, 1, fp);
+    fwrite(ptr, 8, 1, newfp);
+    fclose(newfp);
+}
+
+void formatDirectory(char *dirname)
+{
+    char IMG_Name[11] = "FOO     TXT";
+
+    char input[7] = "foo.txt";
+
+    char expanded_name[12];
+    memset(expanded_name, ' ', 12);
+
+    printf("Wassup\n");
+    char *token = strtok(dirname, ".");
+
+    strncpy(expanded_name, token, strlen(token));
+
+    token = strtok(NULL, ".");
+
+    if (token)
     {
-        strncpy((char *)(formatdir + 8), period, strlen(period));
+        strncpy((char *)(expanded_name + 8), token, strlen(token));
     }
-    formatdir[11] = '\0';
+
+    expanded_name[11] = '\0';
+
     int i;
     for (i = 0; i < 11; i++)
     {
-        formatdir[i] = toupper(formatdir[i]);
+        expanded_name[i] = toupper(expanded_name[i]);
     }
 
-    return formatdir;
+    strncpy(formattedDirectory, expanded_name, 12);
+    //formattedDirectory = expanded_name;
 }
 
 int32_t getCluster(char *dirname)
 {
     //Compare dirname to directory name (attribute), if same, cd into FirstClusterLow
-    return 2;
+    return -1;
 }
 
 void changeDirectory(int32_t cluster)
