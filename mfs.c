@@ -86,8 +86,10 @@ void printDirectory();
 void changeDirectory(int32_t sector);
 void getDirectoryInfo();
 int32_t getCluster(char *dirname);
+int32_t getSizeOfCluster(int32_t cluster);
 void formatDirectory(char *dirname);
 void get();
+void decToHex(int dec);
 
 int main()
 {
@@ -95,13 +97,10 @@ int main()
     //////////////////
     // PROGRAM LOOP //
     //////////////////
-    char *name = (char*)malloc(512);
-    memcpy( name, "foo.txt", strlen( "foo.txt" ));
-    name[strlen("foo.txt")] = '\0';
-    formatDirectory(name);
-    //FOO     TXT
-
-    printf("%s\n", formattedDirectory);
+    // char *name = (char *)malloc(512);
+    // memcpy(name, "foo.txt", strlen("foo.txt"));
+    // name[strlen("foo.txt")] = '\0';
+    // formatDirectory(name);
     while (1)
     {
         getInput();
@@ -198,11 +197,21 @@ void execute()
     }
     else if (strcmp(token[0], "info") == 0)
     {
-        printf("BPB_BytesPerSec: %d\n", BPB_BytesPerSec);
-        printf("BPB_SecPerClus: %d\n", BPB_SecPerClus);
-        printf("BPB_RsvdSecCnt: %d\n", BPB_RsvdSecCnt);
-        printf("BPB_NumFATs: %d\n", BPB_NumFATs);
-        printf("BPB_FATSz32: %d\n", BPB_FATSz32);
+        printf("BPB_BytesPerSec: %d - ", BPB_BytesPerSec);
+        decToHex(BPB_BytesPerSec);
+        printf("\n");
+        printf("BPB_SecPerClus: %d - ", BPB_SecPerClus);
+        decToHex(BPB_SecPerClus);
+        printf("\n");
+        printf("BPB_RsvdSecCnt: %d - ", BPB_RsvdSecCnt);
+        decToHex(BPB_RsvdSecCnt);
+        printf("\n");
+        printf("BPB_NumFATs: %d - ", BPB_NumFATs);
+        decToHex(BPB_NumFATs);
+        printf("\n");
+        printf("BPB_FATSz32: %d - ", BPB_FATSz32);
+        decToHex(BPB_FATSz32);
+        printf("\n");
     }
     else if (strcmp(token[0], "ls") == 0)
     {
@@ -216,6 +225,10 @@ void execute()
             return;
         }
         changeDirectory(getCluster(token[1]));
+    }
+    else if (strcmp(token[0], "get") == 0)
+    {
+        get(token[1]);
     }
     else if (strcmp(token[0], "close") == 0)
     {
@@ -257,20 +270,19 @@ void openImage(char file[])
 void get(char *dirname)
 {
     // -- hard code get num.txt ( cluster 17, size 8 ) --
-    FILE *newfp = fopen("NUM.txt", "w");
-    fseek(fp, LBAToOffset(17), SEEK_SET);
-    unsigned char *ptr = malloc(8);
-    fread(ptr, 8, 1, fp);
-    fwrite(ptr, 8, 1, newfp);
+    int cluster = getCluster(dirname);
+    int size = getSizeOfCluster(cluster);
+    FILE *newfp = fopen(dirname, "w");
+    printf("Seek to cluster: %d\nSize: %d", cluster, size);
+    fseek(fp, cluster, SEEK_SET);
+    unsigned char *ptr = malloc(size);
+    fread(ptr, size, 1, fp);
+    fwrite(ptr, size, 1, newfp);
     fclose(newfp);
 }
 
 void formatDirectory(char *dirname)
 {
-    char IMG_Name[11] = "FOO     TXT";
-
-    char input[7] = "foo.txt";
-
     char expanded_name[12];
     memset(expanded_name, ' ', 12);
 
@@ -293,7 +305,6 @@ void formatDirectory(char *dirname)
     {
         expanded_name[i] = toupper(expanded_name[i]);
     }
-    printf("Expanded: %s\n", expanded_name);
 
     strncpy(formattedDirectory, expanded_name, 12);
     //formattedDirectory = expanded_name;
@@ -302,11 +313,48 @@ void formatDirectory(char *dirname)
 int32_t getCluster(char *dirname)
 {
     //Compare dirname to directory name (attribute), if same, cd into FirstClusterLow
+    formatDirectory(dirname);
+
+    int i;
+    for (i = 0; i < 16; i++)
+    {
+        char *directory = malloc(11);
+        memset(directory, '\0', 11);
+        memcpy(directory, dir[i].DIR_Name, 11);
+
+        if (strcmp(directory, formattedDirectory) == 0)
+        {
+            int cluster = dir[i].DIR_FirstClusterLow;
+            return cluster;
+        }
+    }
+
+    return -1;
+}
+
+int32_t getSizeOfCluster(int32_t cluster)
+{
+    int i;
+    for (i = 0; i < 16; i++)
+    {
+        if (cluster == dir[i].DIR_FirstClusterLow)
+        {
+            int size = dir[i].DIR_FileSize;
+            return size;
+        }
+    }
     return -1;
 }
 
 void changeDirectory(int32_t cluster)
 {
+    if (strcmp(token[1], "..") == 0)
+    {
+        int offset = LBAToOffset(2);
+        currentDirectory = 2;
+        fseek(fp, offset, SEEK_SET);
+        return;
+    }
     int offset = LBAToOffset(cluster);
     currentDirectory = cluster;
     fseek(fp, offset, SEEK_SET);
@@ -321,8 +369,15 @@ void getDirectoryInfo()
     }
 }
 
+// ls
 void printDirectory()
 {
+    if (fp == NULL)
+    {
+        printf("No image is opened\n");
+        return;
+    }
+
     int offset = LBAToOffset(currentDirectory);
     fseek(fp, offset, SEEK_SET);
 
@@ -337,10 +392,36 @@ void printDirectory()
             char *directory = malloc(11);
             memset(directory, '\0', 11);
             memcpy(directory, dir[i].DIR_Name, 11);
-            printf("Directory Name: %s\n", directory);
-            printf("Filesize: %d\n", dir[i].DIR_FileSize);
-            printf("Cluster: %d\n", dir[i].DIR_FirstClusterLow);
+            printf("%s\n", directory);
+            printf("ClusterLow: %d\n", dir[i].DIR_FirstClusterLow);
+            printf("Size: %d\n", dir[i].DIR_FileSize);
         }
+    }
+}
+
+void decToHex(int dec)
+{
+    char hex[100];
+    int i = 1;
+    int j;
+    int temp;
+    while (dec != 0)
+    {
+        temp = dec % 16;
+        if (temp < 10)
+        {
+            temp += 48;
+        }
+        else
+        {
+            temp += 55;
+        }
+        hex[i++] = temp;
+        dec /= 16;
+    }
+    for (j = i - 1; j > 0; j--)
+    {
+        printf("%c", hex[j]);
     }
 }
 
