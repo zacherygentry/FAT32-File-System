@@ -90,6 +90,7 @@ int32_t getSizeOfCluster(int32_t cluster);
 void formatDirectory(char *dirname);
 void get();
 void decToHex(int dec);
+void stat(char *dirname);
 
 int main()
 {
@@ -230,6 +231,10 @@ void execute()
     {
         get(token[1]);
     }
+    else if (strcmp(token[0], "stat") == 0)
+    {
+        stat(token[1]);
+    }
     else if (strcmp(token[0], "close") == 0)
     {
         closeImage();
@@ -273,8 +278,7 @@ void get(char *dirname)
     int cluster = getCluster(dirname);
     int size = getSizeOfCluster(cluster);
     FILE *newfp = fopen(dirname, "w");
-    printf("Seek to cluster: %d\nSize: %d", cluster, size);
-    fseek(fp, cluster, SEEK_SET);
+    fseek(fp, LBAToOffset(cluster), SEEK_SET);
     unsigned char *ptr = malloc(size);
     fread(ptr, size, 1, fp);
     fwrite(ptr, size, 1, newfp);
@@ -344,6 +348,14 @@ int32_t getSizeOfCluster(int32_t cluster)
         }
     }
     return -1;
+}
+
+void stat(char *dirname)
+{
+    int cluster = getCluster(dirname);
+    int size = getSizeOfCluster(cluster);
+    printf("Starting Cluster: %d\n", cluster);
+    printf("Size: %d\n", size);
 }
 
 void changeDirectory(int32_t cluster)
