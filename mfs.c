@@ -44,55 +44,55 @@
 #define MAX_NUM_ARGUMENTS 10 // Mav shell only supports five arguments
 
 // token and cmd_str used for tokenizing user input
-char *token[MAX_NUM_ARGUMENTS];
-char cmd_str[MAX_COMMAND_SIZE];
+char *token[MAX_NUM_ARGUMENTS]; //Parsed input string separated by white space
+char cmd_str[MAX_COMMAND_SIZE];//Entire string inputted by the user. It will be parsed into multiple tokens (47)
 
 char BS_OEMName[8];
-int16_t BPB_BytesPerSec;
-int8_t BPB_SecPerClus;
-int16_t BPB_RsvdSecCnt;
+int16_t BPB_BytesPerSec;//The amount of bytes in each sector of the fat32 file image
+int8_t BPB_SecPerClus;//The amount of sectors per cluster of the fat32 file image
+int16_t BPB_RsvdSecCnt;//Amount of reserved sectors in the fat32 image
 int8_t BPB_NumFATs;
-int16_t BPB_RootEntCnt;
-char BS_VolLab[11];
+int16_t BPB_RootEntCnt; //Root entry count
 int32_t BPB_FATSz32;
-int32_t BPB_RootClus;
+int32_t BPB_RootClus;//Rootcluster location in the fat32 image
 
-int32_t RootDirSectors = 0;
-int32_t FirstDataSector = 0;
-int32_t FirstSectorofCluster = 0;
+int32_t RootDirSectors = 0; //Amount of root directory sectors
+int32_t FirstDataSector = 0;//Where the first data sector exists in the fat32 file image.
+int32_t FirstSectorofCluster = 0;//First sector of the data cluster exists at point 0 in the fat32 file image.
 
-int32_t currentDirectory;
-char formattedDirectory[12];
-char BPB_Volume[11];
+int32_t currentDirectory;//Current working directory
+char formattedDirectory[12];//String to contain the fully formatted string
+char BPB_Volume[11];//String to store the volume of the fat32 file image
 
 struct __attribute__((__packed__)) DirectoryEntry
 {
-    char DIR_Name[11];
-    uint8_t DIR_Attr;
+    char DIR_Name[11];//Name of the directory retrieved
+    uint8_t DIR_Attr;//Attribute count of the directory retrieved
     uint8_t Unused1[8];
     uint16_t DIR_FirstClusterHigh;
     uint8_t Unused2[4];
     uint16_t DIR_FirstClusterLow;
-    uint32_t DIR_FileSize;
+    uint32_t DIR_FileSize;//Size of the directory (Always 0)
 };
-struct DirectoryEntry dir[16];
+struct DirectoryEntry dir[16];//Creation of the directory 
 
 FILE *fp;
 
-void getInput();
-void execute();
-void openImage(char file[]);
-void closeImage();
-void printDirectory();
-void changeDirectory(int32_t sector);
-void getDirectoryInfo();
-int32_t getCluster(char *dirname);
-int32_t getSizeOfCluster(int32_t cluster);
-void formatDirectory(char *dirname);
-void get();
-void decToHex(int dec);
-void stat(char *dirname);
-void volume();
+void getInput();//Receives input from the user that is parsed into tokens.
+void execute();//Main function of the program, acts as the shell receiving commands
+void openImage(char file[]);//Opens a file system image to be used.
+void closeImage();//Closes the file system before exiting the program.
+void printDirectory();//Prints the current working directory (ls)
+void changeDirectory(int32_t sector);//Changes directory by user specification (cd)
+void getDirectoryInfo();//Prints directory info stored in struct above (line 67)
+int32_t getCluster(char *dirname);//Receives the cluster of information to be used in execute (line 82)
+int32_t getSizeOfCluster(int32_t cluster);//Receives of the size of the cluster as an attribute
+void formatDirectory(char *dirname);//Formats the directory to remove whitespace and concatenate a period between the name and extension.
+void get();//Pulls file from the file system image into your cwd (current working directory)
+void decToHex(int dec);//Converts decimal numbers to hex to be printed in info (see execute, line 82)
+void stat(char *dirname);//Prints the attributes of the directory 
+void volume();//Prints the name of the volume in the fat32 file system image
+void readFile(char *dirname, int position, int numOfBytes);//Reads the bytes specified by the user in the file of their choice
 
 int main()
 {
@@ -247,6 +247,15 @@ void execute()
     {
         volume();
     }
+    else if (strcmp(token[0], "read") == 0)
+    {
+        if (token[1] == NULL || token[2] == NULL || token[3] == NULL)
+        {
+            printf("Please input valid arguments.\n");
+            return;
+        }
+        readFile(token[1], atoi(token[2]), atoi(token[3]));
+    }
     else if (strcmp(token[0], "close") == 0)
     {
         closeImage();
@@ -256,6 +265,11 @@ void execute()
 void openImage(char file[])
 {
     fp = fopen(file, "r");
+    if (fp == NULL)
+    {
+        printf("Image does not exist\n");
+        return;
+    }
     printf("%s opened.\n", file);
 
     fseek(fp, 3, SEEK_SET);
@@ -278,26 +292,14 @@ void openImage(char file[])
     int offset = LBAToOffset(currentDirectory);
     fseek(fp, offset, SEEK_SET);
     fread(&dir[0], 32, 16, fp);
-
-    // -- hard code get num.txt ( cluster 17, size 8 ) --
-#if 0
-    FILE *newfp = fopen("NUM.txt", "w");
-    fseek(fp, LBAToOffset(17), SEEK_SET);
-    unsigned char *ptr = malloc(8);
-    fread(ptr, 8, 1, fp);
-    fwrite(ptr, 8, 1, newfp);
-    fclose(newfp);
-#endif
 }
 
 void get(char *dirname)
 {
-    // -- hard code get num.txt ( cluster 17, size 8 ) --
-    char * dirstring = ( char* ) malloc( strlen( dirname ) );
-    strncpy( dirstring, dirname, strlen( dirname ) );
+    char *dirstring = (char *)malloc(strlen(dirname));
+    strncpy(dirstring, dirname, strlen(dirname));
     int cluster = getCluster(dirstring);
     int size = getSizeOfCluster(cluster);
-printf("Dir name %s\n", dirname );
     FILE *newfp = fopen(token[1], "w");
     fseek(fp, LBAToOffset(cluster), SEEK_SET);
     unsigned char *ptr = malloc(size);
@@ -311,22 +313,21 @@ void formatDirectory(char *dirname)
     char expanded_name[12];
     memset(expanded_name, ' ', 12);
 
-    // Bus error here
     char *token = strtok(dirname, ".");
 
-    if( token )
+    if (token)
     {
         strncpy(expanded_name, token, strlen(token));
-    
+
         token = strtok(NULL, ".");
-    
+
         if (token)
         {
             strncpy((char *)(expanded_name + 8), token, strlen(token));
         }
-    
+
         expanded_name[11] = '\0';
-    
+
         int i;
         for (i = 0; i < 11; i++)
         {
@@ -335,11 +336,10 @@ void formatDirectory(char *dirname)
     }
     else
     {
-        strncpy(expanded_name, dirname, strlen(dirname) );
+        strncpy(expanded_name, dirname, strlen(dirname));
         expanded_name[11] = '\0';
     }
     strncpy(formattedDirectory, expanded_name, 12);
-    //formattedDirectory = expanded_name;
 }
 
 void volume()
@@ -407,16 +407,16 @@ void changeDirectory(int32_t cluster)
     if (strcmp(token[1], "..") == 0)
     {
         int i;
-        for( i = 0; i < 16; i++ )
+        for (i = 0; i < 16; i++)
         {
-          if( strncmp( dir[i].DIR_Name, "..", 2 ) == 0 )
-          {  
-              int offset = LBAToOffset( dir[i].DIR_FirstClusterLow );
-              currentDirectory = dir[i].DIR_FirstClusterLow;
-              fseek(fp, offset, SEEK_SET);
-              fread(&dir[0], 32, 16, fp);
-              return;
-          }  
+            if (strncmp(dir[i].DIR_Name, "..", 2) == 0)
+            {
+                int offset = LBAToOffset(dir[i].DIR_FirstClusterLow);
+                currentDirectory = dir[i].DIR_FirstClusterLow;
+                fseek(fp, offset, SEEK_SET);
+                fread(&dir[0], 32, 16, fp);
+                return;
+            }
         }
     }
     int offset = LBAToOffset(cluster);
@@ -432,6 +432,16 @@ void getDirectoryInfo()
     {
         fread(&dir[i], 32, 1, fp);
     }
+}
+
+void readFile(char *dirname, int position, int numOfBytes)
+{
+    int cluster = getCluster(dirname);
+    int offset = LBAToOffset(cluster);
+    fseek(fp, offset + position, SEEK_SET);
+    char *bytes = malloc(numOfBytes);
+    fread(bytes, numOfBytes, 1, fp);
+    printf("%s\n", bytes);
 }
 
 // ls
@@ -458,10 +468,6 @@ void printDirectory()
             memset(directory, '\0', 11);
             memcpy(directory, dir[i].DIR_Name, 11);
             printf("%s\n", directory);
-#if 0
-            printf("ClusterLow: %d\n", dir[i].DIR_FirstClusterLow);
-            printf("Size: %d\n", dir[i].DIR_FileSize);
-#endif
         }
     }
 }
