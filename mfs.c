@@ -95,7 +95,10 @@ int main()
     //////////////////
     // PROGRAM LOOP //
     //////////////////
-    formatDirectory("foo.txt");
+    char *name = (char*)malloc(512);
+    memcpy( name, "foo.txt", strlen( "foo.txt" ));
+    name[strlen("foo.txt")] = '\0';
+    formatDirectory(name);
     //FOO     TXT
 
     printf("%s\n", formattedDirectory);
@@ -271,7 +274,7 @@ void formatDirectory(char *dirname)
     char expanded_name[12];
     memset(expanded_name, ' ', 12);
 
-    printf("Wassup\n");
+    // Bus error here
     char *token = strtok(dirname, ".");
 
     strncpy(expanded_name, token, strlen(token));
@@ -290,6 +293,7 @@ void formatDirectory(char *dirname)
     {
         expanded_name[i] = toupper(expanded_name[i]);
     }
+    printf("Expanded: %s\n", expanded_name);
 
     strncpy(formattedDirectory, expanded_name, 12);
     //formattedDirectory = expanded_name;
