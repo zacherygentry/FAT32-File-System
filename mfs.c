@@ -63,6 +63,7 @@ int32_t FirstSectorofCluster = 0;
 
 int32_t currentDirectory;
 char formattedDirectory[12];
+char BPB_Volume[11];
 
 struct __attribute__((__packed__)) DirectoryEntry
 {
@@ -91,6 +92,7 @@ void formatDirectory(char *dirname);
 void get();
 void decToHex(int dec);
 void stat(char *dirname);
+void volume();
 
 int main()
 {
@@ -195,6 +197,12 @@ void execute()
         {
             printf("ERR: Must give argument of file to open\n");
         }
+        return;
+    }
+    else if (fp == NULL)
+    {
+        printf("Error: File system image must be opened first.\n");
+        return;
     }
     else if (strcmp(token[0], "info") == 0)
     {
@@ -235,6 +243,10 @@ void execute()
     {
         stat(token[1]);
     }
+    else if (strcmp(token[0], "volume") == 0)
+    {
+        volume();
+    }
     else if (strcmp(token[0], "close") == 0)
     {
         closeImage();
@@ -263,21 +275,30 @@ void openImage(char file[])
     fread(&BPB_RootClus, 4, 1, fp);
     currentDirectory = BPB_RootClus;
 
+    int offset = LBAToOffset(currentDirectory);
+    fseek(fp, offset, SEEK_SET);
+    fread(&dir[0], 32, 16, fp);
+
     // -- hard code get num.txt ( cluster 17, size 8 ) --
+#if 0
     FILE *newfp = fopen("NUM.txt", "w");
     fseek(fp, LBAToOffset(17), SEEK_SET);
     unsigned char *ptr = malloc(8);
     fread(ptr, 8, 1, fp);
     fwrite(ptr, 8, 1, newfp);
     fclose(newfp);
+#endif
 }
 
 void get(char *dirname)
 {
     // -- hard code get num.txt ( cluster 17, size 8 ) --
-    int cluster = getCluster(dirname);
+    char * dirstring = ( char* ) malloc( strlen( dirname ) );
+    strncpy( dirstring, dirname, strlen( dirname ) );
+    int cluster = getCluster(dirstring);
     int size = getSizeOfCluster(cluster);
-    FILE *newfp = fopen(dirname, "w");
+printf("Dir name %s\n", dirname );
+    FILE *newfp = fopen(token[1], "w");
     fseek(fp, LBAToOffset(cluster), SEEK_SET);
     unsigned char *ptr = malloc(size);
     fread(ptr, size, 1, fp);
@@ -293,25 +314,39 @@ void formatDirectory(char *dirname)
     // Bus error here
     char *token = strtok(dirname, ".");
 
-    strncpy(expanded_name, token, strlen(token));
-
-    token = strtok(NULL, ".");
-
-    if (token)
+    if( token )
     {
-        strncpy((char *)(expanded_name + 8), token, strlen(token));
+        strncpy(expanded_name, token, strlen(token));
+    
+        token = strtok(NULL, ".");
+    
+        if (token)
+        {
+            strncpy((char *)(expanded_name + 8), token, strlen(token));
+        }
+    
+        expanded_name[11] = '\0';
+    
+        int i;
+        for (i = 0; i < 11; i++)
+        {
+            expanded_name[i] = toupper(expanded_name[i]);
+        }
     }
-
-    expanded_name[11] = '\0';
-
-    int i;
-    for (i = 0; i < 11; i++)
+    else
     {
-        expanded_name[i] = toupper(expanded_name[i]);
+        strncpy(expanded_name, dirname, strlen(dirname) );
+        expanded_name[11] = '\0';
     }
-
     strncpy(formattedDirectory, expanded_name, 12);
     //formattedDirectory = expanded_name;
+}
+
+void volume()
+{
+    fseek(fp, 71, SEEK_SET);
+    fread(&BPB_Volume, 11, 1, fp);
+    printf("Volume name: %s\n", BPB_Volume);
 }
 
 int32_t getCluster(char *dirname)
@@ -326,7 +361,7 @@ int32_t getCluster(char *dirname)
         memset(directory, '\0', 11);
         memcpy(directory, dir[i].DIR_Name, 11);
 
-        if (strcmp(directory, formattedDirectory) == 0)
+        if (strncmp(directory, formattedDirectory, 11) == 0)
         {
             int cluster = dir[i].DIR_FirstClusterLow;
             return cluster;
@@ -354,22 +389,40 @@ void stat(char *dirname)
 {
     int cluster = getCluster(dirname);
     int size = getSizeOfCluster(cluster);
-    printf("Starting Cluster: %d\n", cluster);
     printf("Size: %d\n", size);
+    int i;
+    for (i = 0; i < 16; i++)
+    {
+        if (cluster == dir[i].DIR_FirstClusterLow)
+        {
+            printf("Attr: %d\n", dir[i].DIR_Attr);
+            printf("Starting Cluster: %d\n", cluster);
+            printf("Cluster High: %d\n", dir[i].DIR_FirstClusterHigh);
+        }
+    }
 }
 
 void changeDirectory(int32_t cluster)
 {
     if (strcmp(token[1], "..") == 0)
     {
-        int offset = LBAToOffset(2);
-        currentDirectory = 2;
-        fseek(fp, offset, SEEK_SET);
-        return;
+        int i;
+        for( i = 0; i < 16; i++ )
+        {
+          if( strncmp( dir[i].DIR_Name, "..", 2 ) == 0 )
+          {  
+              int offset = LBAToOffset( dir[i].DIR_FirstClusterLow );
+              currentDirectory = dir[i].DIR_FirstClusterLow;
+              fseek(fp, offset, SEEK_SET);
+              fread(&dir[0], 32, 16, fp);
+              return;
+          }  
+        }
     }
     int offset = LBAToOffset(cluster);
     currentDirectory = cluster;
     fseek(fp, offset, SEEK_SET);
+    fread(&dir[0], 32, 16, fp);
 }
 
 void getDirectoryInfo()
@@ -405,8 +458,10 @@ void printDirectory()
             memset(directory, '\0', 11);
             memcpy(directory, dir[i].DIR_Name, 11);
             printf("%s\n", directory);
+#if 0
             printf("ClusterLow: %d\n", dir[i].DIR_FirstClusterLow);
             printf("Size: %d\n", dir[i].DIR_FileSize);
+#endif
         }
     }
 }
