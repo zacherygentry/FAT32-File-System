@@ -10,6 +10,9 @@ cd <directory>
 ls  
 read <filename> <position> <number of bytes>  
 volume  
+  
+  
+# Implemented Commands
 
 ## open  
 After calling open, check to see if FP is NULL. If NULL, print "Error: File system image not found." If non-null, print "Error: File system image already open."  
