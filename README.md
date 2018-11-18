@@ -14,7 +14,7 @@ volume
   
 # Implemented Commands
 
-## open  <image name>
+## open  \<image name>
 After calling open, check to see if FP is NULL. If NULL, print "Error: File system image not found." If non-null, print "Error: File system image already open."  
 
 ## close  
@@ -30,15 +30,15 @@ BPB_NumFATS
 BPB_FATSz32  
 
 
-## stat  <filename>
+## stat  \<filename>
 Print attributes and starting cluster number of the file or directory name. If it's a directory name, size is 0. If the file or directory does not exist, print "Error: File not found."  
 
 
-## get  <filename>
+## get  \<filename>
 Retrieves file from the FAT32 image and places it in your cwd (current working directory). If it does not exist, print "Error: File not found."  
 
 
-## cd  <folder>
+## cd  \<folder>
 Use chdir(input)  
 
 
@@ -46,7 +46,7 @@ Use chdir(input)
 List directory contents. Supports "." and ".."  
 
 
-## read  <filename>
+## read  \<filename>
 'Reads from the given file at the position, in bytes, specified by the position parameter and output the number bytes specified.' Byte is in size 1, use fseek and have the position be used as the offset. Number of bytes is the count to read.  
 
 
